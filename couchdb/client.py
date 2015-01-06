@@ -67,18 +67,20 @@ class Server(object):
     >>> del server['python-tests']
     """
 
-    def __init__(self, url=DEFAULT_BASE_URL, full_commit=True, session=None):
+    def __init__(self, url=DEFAULT_BASE_URL, full_commit=True, session=None, disable_ssl_verification=False):
         """Initialize the server object.
 
         :param url: the URI of the server (for example
                     ``http://localhost:5984/``)
         :param full_commit: turn on the X-Couch-Full-Commit header
         :param session: an http.Session instance or None for a default session
+        :param disable_ssl_verification: disable ssl verification on Python 2.7.9+
         """
         if isinstance(url, util.strbase):
-            self.resource = http.Resource(url, session or http.Session())
+            session = session or http.Session(disable_ssl_verification=disable_ssl_verification)
+            self.resource = http.Resource(url, session)
         else:
-            self.resource = url # treat as a Resource object
+            self.resource = url  # treat as a Resource object
         if not full_commit:
             self.resource.headers['X-Couch-Full-Commit'] = 'false'
 

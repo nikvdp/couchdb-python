@@ -17,6 +17,7 @@ import errno
 import socket
 import time
 import sys
+import ssl
 
 try:
     from threading import Lock
@@ -191,7 +192,8 @@ RETRYABLE_ERRORS = frozenset([
 class Session(object):
 
     def __init__(self, cache=None, timeout=None, max_redirects=5,
-                 retry_delays=[0], retryable_errors=RETRYABLE_ERRORS):
+                 retry_delays=[0], retryable_errors=RETRYABLE_ERRORS,
+                 disable_ssl_verification=False):
         """Initialize an HTTP client session.
 
         :param cache: an instance with a dict-like interface or None to allow
@@ -216,7 +218,7 @@ class Session(object):
         self.cache = cache
         self.max_redirects = max_redirects
         self.perm_redirects = {}
-        self.connection_pool = ConnectionPool(timeout)
+        self.connection_pool = ConnectionPool(timeout, disable_ssl_verification=disable_ssl_verification)
         self.retry_delays = list(retry_delays) # We don't want this changing on us.
         self.retryable_errors = set(retryable_errors)
 
@@ -420,11 +422,23 @@ class Cache(object):
         self.by_url = dict(ls[-self.keep_size:])
 
 
+class InsecureHTTPSConnection(HTTPSConnection):
+    """ Wrapper class to create an HTTPSConnection without SSl verification (the default behavior in
+    Python < 2.7.9).
+
+    See: https://docs.python.org/2/library/httplib.html#httplib.HTTPSConnection
+    """
+    def __init__(self, *a, **k):
+        k['context'] = ssl._create_unverified_context()
+        HTTPSConnection.__init__(self, *a, **k)
+
+
 class ConnectionPool(object):
     """HTTP connection pool."""
 
-    def __init__(self, timeout):
+    def __init__(self, timeout, disable_ssl_verification=False):
         self.timeout = timeout
+        self.disable_ssl_verification = disable_ssl_verification
         self.conns = {} # HTTP connections keyed by (scheme, host)
         self.lock = Lock()
 
@@ -448,7 +462,10 @@ class ConnectionPool(object):
             if scheme == 'http':
                 cls = HTTPConnection
             elif scheme == 'https':
-                cls = HTTPSConnection
+                if self.disable_ssl_verification:
+                    cls = InsecureHTTPSConnection
+                else:
+                    cls = HTTPSConnection
             else:
                 raise ValueError('%s is not a supported scheme' % scheme)
             conn = cls(host, timeout=self.timeout)
@@ -472,12 +489,12 @@ class ConnectionPool(object):
 
 class Resource(object):
 
-    def __init__(self, url, session, headers=None):
+    def __init__(self, url, session, headers=None, disable_ssl_verification=False):
         if sys.version_info[0] == 2 and isinstance(url, util.utype):
             url = url.encode('utf-8') # kind of an ugly hack for issue 235
         self.url, self.credentials = extract_credentials(url)
         if session is None:
-            session = Session()
+            session = Session(disable_ssl_verification=disable_ssl_verification)
         self.session = session
         self.headers = headers or {}
 
