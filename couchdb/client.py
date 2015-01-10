@@ -276,7 +276,6 @@ class Database(object):
     certificate, you can re-initialize your ConnectionPool as follows (only
     applicable for Python 2.7.9+):
 
-    >>> db = Database(url)
     >>> db.resource.session.disable_ssl_verification()
     """
 
