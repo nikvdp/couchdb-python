@@ -54,7 +54,7 @@ if sys.version < '2.7':
 
         Based on code originally copied from Python 2.7's httplib module.
         """
-        
+
         def endheaders(self, message_body=None):
             if self.__dict__['_HTTPConnection__state'] == _CS_REQ_STARTED:
                 self.__dict__['_HTTPConnection__state'] = _CS_REQ_SENT
@@ -219,11 +219,20 @@ class Session(object):
         self.perm_redirects = {}
         self._disable_ssl_verification = False
         self._timeout = timeout
-        self.connection_pool = ConnectionPool(self._timeout, disable_ssl_verification=self._disable_ssl_verification)
+        self.connection_pool = ConnectionPool(
+            self._timeout,
+            disable_ssl_verification=self._disable_ssl_verification)
         self.retry_delays = list(retry_delays) # We don't want this changing on us.
         self.retryable_errors = set(retryable_errors)
 
     def disable_ssl_verification(self):
+        """
+        Disable verification of SSL certificates and re-initialize the ConnectionPool.
+        Only applicable on Python 2.7.9+ as previous versions of Python don't verify
+        SSL certs.
+
+        :return:
+        """
         self._disable_ssl_verification = True
         self.connection_pool = ConnectionPool(self._timeout, disable_ssl_verification=self._disable_ssl_verification)
 
