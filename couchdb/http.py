@@ -192,8 +192,7 @@ RETRYABLE_ERRORS = frozenset([
 class Session(object):
 
     def __init__(self, cache=None, timeout=None, max_redirects=5,
-                 retry_delays=[0], retryable_errors=RETRYABLE_ERRORS,
-                 disable_ssl_verification=False):
+                 retry_delays=[0], retryable_errors=RETRYABLE_ERRORS):
         """Initialize an HTTP client session.
 
         :param cache: an instance with a dict-like interface or None to allow
@@ -218,9 +217,15 @@ class Session(object):
         self.cache = cache
         self.max_redirects = max_redirects
         self.perm_redirects = {}
-        self.connection_pool = ConnectionPool(timeout, disable_ssl_verification=disable_ssl_verification)
+        self._disable_ssl_verification = False
+        self._timeout = timeout
+        self.connection_pool = ConnectionPool(self._timeout, disable_ssl_verification=self._disable_ssl_verification)
         self.retry_delays = list(retry_delays) # We don't want this changing on us.
         self.retryable_errors = set(retryable_errors)
+
+    def disable_ssl_verification(self):
+        self._disable_ssl_verification = True
+        self.connection_pool = ConnectionPool(self._timeout, disable_ssl_verification=self._disable_ssl_verification)
 
     def request(self, method, url, body=None, headers=None, credentials=None,
                 num_redirects=0):
@@ -490,12 +495,12 @@ class ConnectionPool(object):
 
 class Resource(object):
 
-    def __init__(self, url, session, headers=None, disable_ssl_verification=False):
+    def __init__(self, url, session, headers=None):
         if sys.version_info[0] == 2 and isinstance(url, util.utype):
             url = url.encode('utf-8') # kind of an ugly hack for issue 235
         self.url, self.credentials = extract_credentials(url)
         if session is None:
-            session = Session(disable_ssl_verification=disable_ssl_verification)
+            session = Session()
         self.session = session
         self.headers = headers or {}
 
